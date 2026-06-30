@@ -1,4 +1,4 @@
-{
+[{"name":"XL Velo","fichier":{
   "type": "parcours",
   "waypoints": [
     {
@@ -49,3 +49,4 @@
   ],
   "timestamp": "2026-06-30T13:49:12.517Z"
 }
+}]
