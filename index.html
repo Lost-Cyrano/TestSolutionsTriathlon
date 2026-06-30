@@ -593,7 +593,7 @@
         }
 
         function loadParcoursFromJSON() {
-            fetch('./parcours.json')
+            fetch('https://lost-cyrano.github.io/TestSolutionsTriathlon/parcours.json')
                 .then(response => response.json())
                 .then(data => {
                     // Vider le sélecteur (garder l'option par défaut)
