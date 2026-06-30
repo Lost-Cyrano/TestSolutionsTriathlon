@@ -5,7 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
     <title>Carte Interactive</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
     <style>
         * {
             margin: 0;
@@ -28,21 +30,26 @@
             background: #e8eaed;
         }
 
-        .share-btn {
+        .bottom-bar {
             position: fixed;
             bottom: clamp(20px, 5vh, 40px);
             left: 50%;
             transform: translateX(-50%);
             z-index: 1001;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            align-items: center;
+            width: min(90%, 500px);
+        }
+
+        .share-btn,
+        .waypoint-btn {
             padding: clamp(14px, 2vh, 20px) clamp(24px, 4vw, 48px);
-            background: #25D366;
-            color: white;
             border: none;
             border-radius: 50px;
             font-size: clamp(0.9rem, 1.6vw, 1.2rem);
             font-weight: 600;
-            cursor: not-allowed;
-            box-shadow: 0 4px 24px rgba(37, 211, 102, 0.3);
             transition: all 0.3s ease;
             display: flex;
             align-items: center;
@@ -51,9 +58,16 @@
             font-family: inherit;
             white-space: nowrap;
             min-height: 56px;
-            min-width: 220px;
-            pointer-events: none;
+            width: 100%;
             border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .share-btn {
+            background: #25D366;
+            color: white;
+            cursor: not-allowed;
+            box-shadow: 0 4px 24px rgba(37, 211, 102, 0.3);
+            pointer-events: none;
             opacity: 0.6;
         }
 
@@ -65,14 +79,40 @@
         }
 
         .share-btn.active:hover {
-            transform: translateX(-50%) scale(1.05);
+            transform: scale(1.03);
             box-shadow: 0 6px 32px rgba(37, 211, 102, 0.6);
         }
 
         .share-btn.active:active {
-            transform: translateX(-50%) scale(0.95);
+            transform: scale(0.97);
         }
 
+        .waypoint-btn {
+            background: #1a73e8;
+            color: white;
+            cursor: not-allowed;
+            box-shadow: 0 4px 24px rgba(26, 115, 232, 0.3);
+            pointer-events: none;
+            opacity: 0.6;
+        }
+
+        .waypoint-btn.active {
+            cursor: pointer;
+            pointer-events: all;
+            opacity: 1;
+            box-shadow: 0 4px 24px rgba(26, 115, 232, 0.5);
+        }
+
+        .waypoint-btn.active:hover {
+            transform: scale(1.03);
+            box-shadow: 0 6px 32px rgba(26, 115, 232, 0.6);
+        }
+
+        .waypoint-btn.active:active {
+            transform: scale(0.97);
+        }
+
+        .waypoint-btn .icon,
         .share-btn .icon {
             font-size: clamp(1.1rem, 1.8vw, 1.4rem);
         }
@@ -98,23 +138,76 @@
         }
 
         @keyframes fadeInOut {
-            0% { opacity: 0; transform: translateX(-50%) translateY(-10px); }
-            20% { opacity: 1; transform: translateX(-50%) translateY(0); }
-            80% { opacity: 1; transform: translateX(-50%) translateY(0); }
-            100% { opacity: 0; transform: translateX(-50%) translateY(-10px); }
+            0% {
+                opacity: 0;
+                transform: translateX(-50%) translateY(-10px);
+            }
+            20% {
+                opacity: 1;
+                transform: translateX(-50%) translateY(0);
+            }
+            80% {
+                opacity: 1;
+                transform: translateX(-50%) translateY(0);
+            }
+            100% {
+                opacity: 0;
+                transform: translateX(-50%) translateY(-10px);
+            }
+        }
+
+        .custom-marker {
+            background: #ff6b35;
+            color: white;
+            border-radius: 50%;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 14px;
+            border: 3px solid white;
+            box-shadow: 0 2px 12px rgba(255, 107, 53, 0.6);
+        }
+
+        .share-marker {
+            background: #1a73e8;
+            color: white;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+            border: 3px solid white;
+            box-shadow: 0 2px 12px rgba(26, 115, 232, 0.5);
+        }
+
+        .leaflet-routing-container {
+            display: none !important;
+        }
+
+        .leaflet-routing-alternatives-container {
+            display: none !important;
         }
 
         @media (max-width: 600px) {
-            .share-btn {
+            .bottom-bar {
                 bottom: clamp(16px, 4vh, 30px);
+                width: 95%;
+                gap: 10px;
+            }
+            .share-btn,
+            .waypoint-btn {
                 padding: 12px 20px;
                 font-size: 0.85rem;
                 min-height: 48px;
-                min-width: 180px;
-                gap: 8px;
                 border-radius: 40px;
             }
-            .share-btn .icon {
+            .share-btn .icon,
+            .waypoint-btn .icon {
                 font-size: 1rem;
             }
             .click-hint {
@@ -127,16 +220,19 @@
         }
 
         @media (max-width: 400px) {
-            .share-btn {
+            .bottom-bar {
                 bottom: 12px;
+                gap: 8px;
+            }
+            .share-btn,
+            .waypoint-btn {
                 padding: 10px 16px;
                 font-size: 0.75rem;
                 min-height: 44px;
-                min-width: 150px;
-                gap: 6px;
                 border-radius: 30px;
             }
-            .share-btn .icon {
+            .share-btn .icon,
+            .waypoint-btn .icon {
                 font-size: 0.85rem;
             }
             .click-hint {
@@ -147,15 +243,20 @@
         }
 
         @media (orientation: landscape) and (max-height: 500px) {
-            .share-btn {
+            .bottom-bar {
                 bottom: 12px;
+                gap: 6px;
+                width: 80%;
+            }
+            .share-btn,
+            .waypoint-btn {
                 padding: 8px 16px;
                 font-size: 0.75rem;
                 min-height: 38px;
-                min-width: 140px;
-                gap: 6px;
+                border-radius: 30px;
             }
-            .share-btn .icon {
+            .share-btn .icon,
+            .waypoint-btn .icon {
                 font-size: 0.8rem;
             }
             .click-hint {
@@ -179,6 +280,22 @@
             .share-btn.active:hover {
                 box-shadow: 0 6px 32px rgba(37, 211, 102, 0.5);
             }
+            .waypoint-btn {
+                background: #4a8af4;
+                box-shadow: 0 4px 24px rgba(26, 115, 232, 0.2);
+            }
+            .waypoint-btn.active {
+                box-shadow: 0 4px 24px rgba(26, 115, 232, 0.4);
+            }
+            .waypoint-btn.active:hover {
+                box-shadow: 0 6px 32px rgba(26, 115, 232, 0.5);
+            }
+            .custom-marker {
+                border-color: #1a1a2e;
+            }
+            .share-marker {
+                border-color: #1a1a2e;
+            }
         }
 
         .leaflet-control-attribution {
@@ -186,9 +303,8 @@
             opacity: 0.6;
         }
 
-        .leaflet-popup-content {
-            font-size: 13px;
-            min-width: 200px;
+        .leaflet-routing-icon {
+            display: none !important;
         }
     </style>
 </head>
@@ -197,10 +313,16 @@
 
     <div class="click-hint">👆 Cliquez sur la carte pour placer un point</div>
 
-    <button class="share-btn" id="shareBtn">
-        <span class="icon">📤</span>
-        <span>Partager par SMS</span>
-    </button>
+    <div class="bottom-bar">
+        <button class="waypoint-btn" id="waypointBtn">
+            <span class="icon">📍</span>
+            <span>Ajouter aux points de parcours</span>
+        </button>
+        <button class="share-btn" id="shareBtn">
+            <span class="icon">📤</span>
+            <span>Partager par SMS</span>
+        </button>
+    </div>
 
     <script>
         const map = L.map('map', {
@@ -216,13 +338,17 @@
             attribution: '© OpenStreetMap contributors'
         }).addTo(map);
 
-        let marker = null;
-        let currentLat = null;
-        let currentLng = null;
+        let waypoints = [];
+        let waypointMarkers = [];
+        let shareMarker = null;
+        let currentShareLat = null;
+        let currentShareLng = null;
         let currentAddress = '';
-        let pointPlaced = false;
+        let routingControl = null;
+        let userLocationMarker = null;
 
         const shareBtn = document.getElementById('shareBtn');
+        const waypointBtn = document.getElementById('waypointBtn');
 
         function getAddress(lat, lng) {
             const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1&accept-language=fr`;
@@ -240,25 +366,151 @@
                 });
         }
 
-        function placeMarker(lat, lng) {
-            if (marker) {
-                map.removeLayer(marker);
+        function createWaypointMarker(number) {
+            const div = document.createElement('div');
+            div.className = 'custom-marker';
+            div.textContent = number;
+            return L.divIcon({
+                html: div,
+                className: '',
+                iconSize: [32, 32],
+                iconAnchor: [16, 16]
+            });
+        }
+
+        function createShareMarker() {
+            const div = document.createElement('div');
+            div.className = 'share-marker';
+            div.textContent = '📌';
+            return L.divIcon({
+                html: div,
+                className: '',
+                iconSize: [30, 30],
+                iconAnchor: [15, 15]
+            });
+        }
+
+        function updateRoute() {
+            if (routingControl) {
+                map.removeControl(routingControl);
+                routingControl = null;
             }
 
-            marker = L.marker([lat, lng], {
-                draggable: true
+            if (waypoints.length >= 2) {
+                const latlngs = waypoints.map(w => L.latLng(w.lat, w.lng));
+                routingControl = L.Routing.control({
+                    waypoints: latlngs,
+                    routeWhileDragging: false,
+                    show: false,
+                    addWaypoints: false,
+                    fitSelectedRoutes: true,
+                    showAlternatives: false,
+                    lineOptions: {
+                        styles: [{ 
+                            color: '#ff6b35', 
+                            weight: 5, 
+                            opacity: 0.9,
+                            dashArray: null
+                        }]
+                    },
+                    router: L.Routing.osrmv1({
+                        serviceUrl: 'https://router.project-osrm.org/route/v1/'
+                    }),
+                    createMarker: function() { return null; }
+                }).addTo(map);
+
+                routingControl.on('routesfound', function(e) {
+                    const route = e.routes[0];
+                    const totalDistance = (route.summary.totalDistance / 1000).toFixed(1);
+                    const totalTime = Math.round(route.summary.totalTime / 60);
+                    
+                    const arrowStyle = {
+                        color: '#ff6b35',
+                        weight: 5,
+                        opacity: 0.9,
+                        dashArray: null,
+                        lineCap: 'round',
+                        lineJoin: 'round'
+                    };
+
+                    const coordinates = route.coordinates;
+                    if (coordinates && coordinates.length > 1) {
+                        const arrowLayer = L.polyline(coordinates, arrowStyle).addTo(map);
+                        
+                        for (let i = 0; i < coordinates.length - 1; i += Math.floor(coordinates.length / 20)) {
+                            const p1 = coordinates[i];
+                            const p2 = coordinates[Math.min(i + 1, coordinates.length - 1)];
+                            const angle = Math.atan2(p2.lat - p1.lat, p2.lng - p1.lng) * 180 / Math.PI;
+                            
+                            const midLat = (p1.lat + p2.lat) / 2;
+                            const midLng = (p1.lng + p2.lng) / 2;
+                            
+                            const arrowIcon = L.divIcon({
+                                html: '▶',
+                                iconSize: [12, 12],
+                                className: 'arrow-icon',
+                                iconAnchor: [6, 6]
+                            });
+                            
+                            const arrow = L.marker([midLat, midLng], {
+                                icon: arrowIcon,
+                                rotationAngle: angle + 90,
+                                interactive: false
+                            }).addTo(map);
+                            
+                            arrow._icon.style.transform += ` rotate(${angle + 90}deg)`;
+                            arrow._icon.style.filter = 'drop-shadow(0 0 2px rgba(255,107,53,0.8))';
+                        }
+                    }
+                });
+            }
+        }
+
+        function addWaypoint(lat, lng) {
+            const number = waypoints.length + 1;
+            const marker = L.marker([lat, lng], {
+                icon: createWaypointMarker(number),
+                draggable: false
             }).addTo(map);
 
-            currentLat = lat;
-            currentLng = lng;
-            pointPlaced = true;
+            waypoints.push({ lat, lng, number });
+            waypointMarkers.push(marker);
+
+            if (shareMarker) {
+                map.removeLayer(shareMarker);
+                shareMarker = null;
+                currentShareLat = null;
+                currentShareLng = null;
+            }
+
+            if (waypoints.length >= 1) {
+                waypointBtn.classList.add('active');
+            }
+
+            if (waypoints.length >= 2) {
+                updateRoute();
+            }
+
+            if (waypoints.length >= 1) {
+                shareBtn.classList.add('active');
+            }
+        }
+
+        function placeShareMarker(lat, lng) {
+            if (shareMarker) {
+                map.removeLayer(shareMarker);
+            }
+
+            shareMarker = L.marker([lat, lng], {
+                icon: createShareMarker(),
+                draggable: false
+            }).addTo(map);
+
+            currentShareLat = lat;
+            currentShareLng = lng;
 
             shareBtn.classList.add('active');
-
-            marker.on('dragend', function(e) {
-                const pos = marker.getLatLng();
-                placeMarker(pos.lat, pos.lng);
-            });
+            waypointBtn.classList.add('active');
 
             getAddress(lat, lng).then(address => {
                 currentAddress = address;
@@ -268,17 +520,49 @@
         map.on('click', function(e) {
             const lat = e.latlng.lat;
             const lng = e.latlng.lng;
-            placeMarker(lat, lng);
+            
+            if (shareMarker) {
+                map.removeLayer(shareMarker);
+                shareMarker = null;
+            }
+            
+            placeShareMarker(lat, lng);
+        });
+
+        waypointBtn.addEventListener('click', function() {
+            if (currentShareLat !== null && currentShareLng !== null) {
+                addWaypoint(currentShareLat, currentShareLng);
+            } else {
+                alert('Veuillez d\'abord cliquer sur la carte pour placer un point.');
+            }
         });
 
         shareBtn.addEventListener('click', function() {
-            if (!pointPlaced || currentLat === null || currentLng === null) {
+            const pointsToShare = waypoints.length > 0 ? waypoints : 
+                (currentShareLat !== null ? [{ lat: currentShareLat, lng: currentShareLng, number: 1 }] : []);
+
+            if (pointsToShare.length === 0) {
                 return;
             }
 
-            const coords = `${currentLat.toFixed(6)}, ${currentLng.toFixed(6)}`;
-            const mapsLink = `https://www.openstreetmap.org/?mlat=${currentLat}&mlon=${currentLng}&zoom=16`;
-            const message = `L'organisation vous partage la coordonnée suivante :\n\n- Lien pour ouvrir la coordonnée : ${mapsLink}\n- Adresse du point : ${currentAddress}\n- Coordonnée exacte : ${coords}`;
+            let message = 'L\'organisation vous partage les coordonnées suivantes :\n\n';
+            
+            pointsToShare.forEach((wp, index) => {
+                const coords = `${wp.lat.toFixed(6)}, ${wp.lng.toFixed(6)}`;
+                const mapsLink = `https://www.openstreetmap.org/?mlat=${wp.lat}&mlon=${wp.lng}&zoom=16`;
+                message += `Point ${wp.number} :\n- Lien : ${mapsLink}\n- Coordonnée : ${coords}\n\n`;
+            });
+
+            if (waypoints.length >= 2) {
+                message += 'Itinéraire : ';
+                const links = waypoints.map((wp, index) => {
+                    if (index < waypoints.length - 1) {
+                        return `https://www.openstreetmap.org/directions?from=${waypoints[index].lat},${waypoints[index].lng}&to=${waypoints[index+1].lat},${waypoints[index+1].lng}`;
+                    }
+                    return '';
+                }).filter(l => l);
+                message += links.join(' | ');
+            }
             
             const phoneNumber = '33781450856';
             const encodedMessage = encodeURIComponent(message);
@@ -287,7 +571,53 @@
             window.open(smsUrl, '_blank');
         });
 
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    const lat = position.coords.latitude;
+                    const lng = position.coords.longitude;
+                    map.setView([lat, lng], 15);
+                    
+                    const userIcon = L.divIcon({
+                        html: '📍',
+                        iconSize: [24, 24],
+                        className: 'user-location',
+                        iconAnchor: [12, 12]
+                    });
+                    
+                    userLocationMarker = L.marker([lat, lng], {
+                        icon: userIcon,
+                        draggable: false
+                    }).addTo(map);
+                },
+                () => {
+                    map.setView([44.5639, 6.4951], 15);
+                },
+                {
+                    enableHighAccuracy: true,
+                    timeout: 10000,
+                    maximumAge: 0
+                }
+            );
+        } else {
+            map.setView([44.5639, 6.4951], 15);
+        }
+
         document.querySelector('.leaflet-control-zoom').style.zIndex = '999';
+
+        const style = document.createElement('style');
+        style.textContent = `
+            .arrow-icon {
+                font-size: 14px;
+                color: #ff6b35;
+                text-shadow: 0 0 8px rgba(255,107,53,0.8);
+            }
+            .user-location {
+                font-size: 20px;
+                filter: drop-shadow(0 0 4px rgba(26,115,232,0.6));
+            }
+        `;
+        document.head.appendChild(style);
     </script>
 </body>
 </html>
