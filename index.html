@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
+    <title>Carte Interactive</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html, body {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+        }
+
+        #map {
+            width: 100vw;
+            height: 100vh;
+            height: 100dvh;
+            background: #e8eaed;
+        }
+
+        .info-overlay {
+            position: fixed;
+            bottom: clamp(20px, 4vh, 40px);
+            left: 50%;
+            transform: translateX(-50%);
+            width: min(90%, 700px);
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border-radius: 16px;
+            box-shadow: 0 8px 40px rgba(0, 0, 0, 0.2), 0 2px 8px rgba(0, 0, 0, 0.08);
+            padding: clamp(14px, 2.5vh, 24px) clamp(16px, 3vw, 28px);
+            z-index: 1000;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            transition: all 0.3s ease;
+            pointer-events: none;
+        }
+
+        .info-overlay .info-content {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            pointer-events: none;
+        }
+
+        .info-overlay .info-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: clamp(0.8rem, 1.4vw, 1.05rem);
+            line-height: 1.4;
+            pointer-events: none;
+        }
+
+        .info-overlay .info-icon {
+            font-size: clamp(1rem, 1.6vw, 1.3rem);
+            flex-shrink: 0;
+            width: 24px;
+            text-align: center;
+            pointer-events: none;
+        }
+
+        .info-overlay .info-label {
+            font-weight: 600;
+            color: #5f6368;
+            min-width: 80px;
+            flex-shrink: 0;
+            pointer-events: none;
+        }
+
+        .info-overlay .info-value {
+            color: #1a1a2e;
+            font-weight: 500;
+            word-break: break-word;
+            flex: 1;
+            pointer-events: none;
+        }
+
+        .info-overlay .info-value.coords {
+            color: #1a73e8;
+            font-family: 'Courier New', monospace;
+            font-weight: 600;
+        }
+
+        .info-overlay .empty-state {
+            text-align: center;
+            color: #5f6368;
+            font-size: clamp(0.85rem, 1.3vw, 1rem);
+            padding: 4px 0;
+            pointer-events: none;
+        }
+
+        .info-overlay .empty-state span {
+            opacity: 0.7;
+        }
+
+        .click-hint {
+            position: fixed;
+            top: clamp(16px, 3vh, 30px);
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            color: white;
+            padding: 8px 20px;
+            border-radius: 30px;
+            font-size: clamp(0.7rem, 1.2vw, 0.9rem);
+            font-weight: 500;
+            z-index: 1000;
+            letter-spacing: 0.3px;
+            pointer-events: none;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            white-space: nowrap;
+        }
+
+        .click-hint span {
+            display: inline-block;
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .share-btn {
+            position: fixed;
+            bottom: clamp(100px, 15vh, 140px);
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 1001;
+            padding: clamp(12px, 1.8vh, 18px) clamp(24px, 4vw, 40px);
+            background: #25D366;
+            color: white;
+            border: none;
+            border-radius: 50px;
+            font-size: clamp(0.9rem, 1.4vw, 1.1rem);
+            font-weight: 600;
+            cursor: pointer;
+            box-shadow: 0 4px 20px rgba(37, 211, 102, 0.4);
+            transition: all 0.3s ease;
+            display: none;
+            align-items: center;
+            gap: 10px;
+            pointer-events: all;
+            font-family: inherit;
+            white-space: nowrap;
+        }
+
+        .share-btn:hover {
+            transform: translateX(-50%) scale(1.05);
+            box-shadow: 0 6px 30px rgba(37, 211, 102, 0.5);
+        }
+
+        .share-btn:active {
+            transform: translateX(-50%) scale(0.95);
+        }
+
+        .share-btn.visible {
+            display: flex;
+        }
+
+        @media (max-width: 600px) {
+            .info-overlay {
+                bottom: 12px;
+                padding: 12px 14px;
+                width: 95%;
+                border-radius: 12px;
+            }
+            .info-overlay .info-row {
+                font-size: 0.75rem;
+                gap: 6px;
+            }
+            .info-overlay .info-label {
+                min-width: 55px;
+                font-size: 0.7rem;
+            }
+            .info-overlay .info-icon {
+                font-size: 0.85rem;
+                width: 20px;
+            }
+            .click-hint {
+                top: 10px;
+                padding: 5px 14px;
+                font-size: 0.65rem;
+                white-space: normal;
+            }
+            .share-btn {
+                bottom: clamp(80px, 12vh, 100px);
+                padding: 10px 18px;
+                font-size: 0.8rem;
+                gap: 6px;
+                white-space: normal;
+            }
+        }
+
+        @media (max-width: 400px) {
+            .info-overlay {
+                bottom: 8px;
+                padding: 10px 12px;
+                border-radius: 10px;
+            }
+            .info-overlay .info-row {
+                font-size: 0.65rem;
+                gap: 4px;
+            }
+            .info-overlay .info-label {
+                min-width: 45px;
+                font-size: 0.6rem;
+            }
+            .info-overlay .info-icon {
+                font-size: 0.75rem;
+                width: 18px;
+            }
+            .share-btn {
+                bottom: clamp(70px, 10vh, 85px);
+                padding: 8px 14px;
+                font-size: 0.7rem;
+            }
+        }
+
+        @media (orientation: landscape) and (max-height: 500px) {
+            .info-overlay {
+                bottom: 8px;
+                padding: 10px 16px;
+                width: 80%;
+            }
+            .info-overlay .info-row {
+                font-size: 0.7rem;
+                gap: 6px;
+            }
+            .info-overlay .info-label {
+                min-width: 60px;
+            }
+            .click-hint {
+                top: 6px;
+                padding: 4px 12px;
+                font-size: 0.6rem;
+            }
+            .share-btn {
+                bottom: clamp(60px, 8vh, 80px);
+                padding: 6px 14px;
+                font-size: 0.7rem;
+            }
+        }
+
+        @media (prefers-color-scheme: dark) {
+            .info-overlay {
+                background: rgba(30, 30, 50, 0.92);
+                border-color: rgba(255, 255, 255, 0.1);
+            }
+            .info-overlay .info-label {
+                color: #9aa0a6;
+            }
+            .info-overlay .info-value {
+                color: #e8eaed;
+            }
+            .info-overlay .info-value.coords {
+                color: #4a8af4;
+            }
+            .info-overlay .empty-state {
+                color: #9aa0a6;
+            }
+            .click-hint {
+                background: rgba(0, 0, 0, 0.8);
+            }
+        }
+
+        .leaflet-control-attribution {
+            font-size: 9px !important;
+            opacity: 0.6;
+        }
+
+        .leaflet-popup-content {
+            font-size: 13px;
+            min-width: 200px;
+        }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+
+    <div class="click-hint">
+        <span>👆 Cliquez n'importe où sur la carte pour placer un point</span>
+    </div>
+
+    <button class="share-btn" id="shareBtn">
+        <span>📤</span> Partager par SMS
+    </button>
+
+    <div class="info-overlay" id="infoOverlay">
+        <div class="info-content" id="infoContent">
+            <div class="empty-state">
+                <span>📍 Cliquez sur la carte pour afficher les informations</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const map = L.map('map', {
+            center: [46.603354, 1.888334],
+            zoom: 6,
+            zoomControl: true,
+            fadeAnimation: true,
+            attributionControl: true
+        });
+
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+            attribution: '© OpenStreetMap contributors'
+        }).addTo(map);
+
+        let marker = null;
+        let popup = null;
+        let currentLat = null;
+        let currentLng = null;
+        let currentAddress = '';
+
+        function getAddress(lat, lng) {
+            const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1&accept-language=fr`;
+
+            return fetch(url)
+                .then(response => response.json())
+                .then(data => {
+                    if (data && data.display_name) {
+                        return data.display_name;
+                    }
+                    return 'Adresse non trouvée';
+                })
+                .catch(() => {
+                    return 'Adresse non disponible';
+                });
+        }
+
+        function updateInfo(lat, lng) {
+            const infoContent = document.getElementById('infoContent');
+            const latStr = lat.toFixed(6);
+            const lngStr = lng.toFixed(6);
+            currentLat = lat;
+            currentLng = lng;
+
+            infoContent.innerHTML = `
+                <div class="info-row">
+                    <span class="info-icon">🏠</span>
+                    <span class="info-label">Adresse</span>
+                    <span class="info-value" id="addressValue">Chargement...</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-icon">📍</span>
+                    <span class="info-label">Coordonnées</span>
+                    <span class="info-value coords">${latStr}, ${lngStr}</span>
+                </div>
+            `;
+
+            document.getElementById('shareBtn').classList.add('visible');
+
+            getAddress(lat, lng).then(address => {
+                currentAddress = address;
+                document.getElementById('addressValue').textContent = address;
+            });
+        }
+
+        function placeMarker(lat, lng) {
+            if (marker) {
+                map.removeLayer(marker);
+            }
+            if (popup) {
+                map.removeLayer(popup);
+            }
+
+            marker = L.marker([lat, lng], {
+                draggable: true
+            }).addTo(map);
+
+            popup = L.popup({
+                autoClose: false,
+                closeOnClick: false,
+                className: 'custom-popup'
+            })
+            .setLatLng([lat, lng])
+            .setContent('📍 Point sélectionné')
+            .openOn(map);
+
+            updateInfo(lat, lng);
+
+            marker.on('dragend', function(e) {
+                const pos = marker.getLatLng();
+                placeMarker(pos.lat, pos.lng);
+            });
+        }
+
+        map.on('click', function(e) {
+            const lat = e.latlng.lat;
+            const lng = e.latlng.lng;
+            placeMarker(lat, lng);
+        });
+
+        document.getElementById('shareBtn').addEventListener('click', function() {
+            if (currentLat === null || currentLng === null) {
+                alert('Veuillez d\'abord placer un point sur la carte.');
+                return;
+            }
+
+            const coords = `${currentLat.toFixed(6)}, ${currentLng.toFixed(6)}`;
+            const mapsLink = `https://www.openstreetmap.org/?mlat=${currentLat}&mlon=${currentLng}&zoom=16`;
+            const message = `L'organisation vous partage la coordonnée suivante :\n\n- Lien pour ouvrir la coordonnée : ${mapsLink}\n- Adresse du point : ${currentAddress}\n- Coordonnée exacte : ${coords}`;
+            
+            const phoneNumber = '33781450856';
+            const encodedMessage = encodeURIComponent(message);
+            const smsUrl = `sms:${phoneNumber}?body=${encodedMessage}`;
+            
+            window.open(smsUrl, '_blank');
+        });
+
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    const lat = position.coords.latitude;
+                    const lng = position.coords.longitude;
+                    map.setView([lat, lng], 15);
+                    placeMarker(lat, lng);
+                },
+                () => {
+                    map.setView([44.5639, 6.4951], 15);
+                    placeMarker(44.5639, 6.4951);
+                },
+                {
+                    enableHighAccuracy: true,
+                    timeout: 10000,
+                    maximumAge: 0
+                }
+            );
+        } else {
+            map.setView([44.5639, 6.4951], 15);
+            placeMarker(44.5639, 6.4951);
+        }
+
+        document.querySelector('.leaflet-control-zoom').style.zIndex = '999';
+    </script>
+</body>
+</html>
